@@ -1,5 +1,10 @@
 import express, { Express, Response, Request } from 'express';
 import jwt, { Secret } from "jsonwebtoken";
+import mongoose from 'mongoose';
+
+mongoose.connect('mongodb+srv://pcuser876:admin@cluster0.laynzuo.mongodb.net/?retryWrites=true&w=majority')
+.then(() => console.log('DB OK'))
+.catch(err => console.log('DB EROOR', err));
 
 const app: Express = express();
 
