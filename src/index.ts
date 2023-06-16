@@ -5,6 +5,11 @@ import mongoose from 'mongoose';
 import { registerValidation } from './validations/auth';
 import { validationResult, Result } from 'express-validator/src/validation-result';
 import UserModel from './models/User';
+import checkAuth from './utils/checkAuth';
+
+interface AuthenticatedRequest extends Request {
+  userId?: string
+}
 
 mongoose
   .connect('mongodb+srv://pcuser876:admin@cluster0.laynzuo.mongodb.net/blog?retryWrites=true&w=majority')
@@ -99,6 +104,20 @@ app.post('/register', registerValidation, async (req: Request, res: Response) =>
   } catch (err) {
     return handleErrors(err, res, 500, "Error, registration could not be performed");
   }
-})
+});
+
+app.get('/me', checkAuth, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const user = await UserModel.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ ...user.toObject() });
+  } catch (error) {
+    return handleErrors(error, res, 500, 'Internal server error');
+  }
+});
 
 app.listen(4444, () => console.log('Server OK!'));
