@@ -21,7 +21,7 @@ const generateToken = (userId: string): string => {
   );
 }
 
-const handleErrors = async (err: any, res: Response, status: number, message: string) => {
+export const handleErrors = async (err: any, res: Response, status: number, message: string) => {
   console.log(err);
   res.status(status).json({ message })
 };
