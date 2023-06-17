@@ -1,14 +1,14 @@
-import express, { Express, Response, Request } from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
-import { registerValidation } from './validations/auth';
-import { validationResult, Result } from 'express-validator/src/validation-result';
-import UserModel from './models/User';
+import multer, { Multer, StorageEngine } from 'multer';
+import { registerValidation, loginValidation, postCreateValidation } from './validations';
 import checkAuth from './utils/checkAuth';
+import * as userController from './controllers/userController';
+import * as postController from './controllers/postController';
+import handleValidationErrors from './utils/handleValidationErrors';
 
-interface AuthenticatedRequest extends Request {
-  userId?: string
+interface MulterCallback<T> {
+  (error: Error | null, result: T): void
 }
 
 mongoose
@@ -16,108 +16,41 @@ mongoose
   .then(() => console.log('DB OK'))
   .catch(err => console.log('DB EROOR', err));
 
-const app: Express = express();
+const app: any = express();
 
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
-const generateToken = (userId: string): string => {
-  return jwt.sign(
-    {
-      _id: userId,
-    },
-    'secret-123',
-    {
-      expiresIn: '30d'
-    }
-
-  );
-}
-
-const handleErrors = async (err: any, res: Response, status: number, message: string) => {
-  console.log(err);
-  res.status(status).json({ message })
-};
-
-app.post('/login', async (req: Request, res: Response) => {
-  try {
-    const user = await UserModel.findOne({ email: req.body.email });
-
-    if (!user) {
-      return res.status(404).json({ message: 'You are not registered' });
-    }
-
-    const isValidPass: boolean = await bcrypt.compare(req.body.password, user.toObject().passwordHash);
-
-    if (!isValidPass) {
-      return res.status(400).json({ message: 'Invalid login or password' });
-    }
-
-    const token: string = generateToken(user._id);
-
-    res.json({
-      ...user.toObject(),
-      token
-    });
-
-  } catch (err) {
-    return handleErrors(err, res, 400, "Failed to login");
-  }
-})
-
-app.post('/register', registerValidation, async (req: Request, res: Response) => {
-  try {
-    const errors: Result = validationResult(req);
-
-    if (!errors.isEmpty()) {
-      return res.status(400).json(errors)
-    }
-
-    const password: string = req.body.password;
-    const salt: string = await bcrypt.genSalt(10);
-    const passwordHash: string = await bcrypt.hash(password, salt);
-
-    const document = new UserModel({
-      email: req.body.email,
-      fullName: req.body.fullName,
-      avatarUrl: req.body.avatarUrl,
-      passwordHash,
-    });
-
-    const user = await document.save();
-
-    const token: string = jwt.sign(
-      {
-        _id: user._id,
-      },
-      'secret-123',
-      {
-        expiresIn: '30d'
-      }
-
-    )
-
-    res.json({
-      ...user.toObject(),
-      token
-    });
-
-  } catch (err) {
-    return handleErrors(err, res, 500, "Error, registration could not be performed");
+const storage: StorageEngine = multer.diskStorage({
+  destination: (_: any, __: any, cb: MulterCallback<string>) => {
+    cb(null, 'uploads');
+  },
+  filename: (_: any, file: Express.Multer.File, cb: MulterCallback<string>) => {
+    cb(null, file.originalname)
   }
 });
 
-app.get('/me', checkAuth, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const user = await UserModel.findById(req.userId);
+const upload: Multer = multer({ storage });
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+app.post('/login', loginValidation, handleValidationErrors, userController.login);
+app.post('/register', registerValidation, handleValidationErrors, userController.register);
+app.get('/me', checkAuth, userController.userInfo);
 
-    res.json({ ...user.toObject() });
-  } catch (error) {
-    return handleErrors(error, res, 500, 'Internal server error');
+app.post('/upload', checkAuth, upload.single('image'), (req: Request, res: Response) => {
+  if (req.file) {
+    res.json({
+      url: `/uploads/${req.file.originalname}`
+    });
+  } else {
+    res.status(400).json({ error: 'No file uploaded.' });
   }
 });
+
+
+app.get('/posts', postController.getAll);
+app.get('/posts/:id', postController.getOne);
+app.post('/posts', checkAuth, postCreateValidation, handleValidationErrors, postController.create);
+app.delete('/posts/:id', checkAuth, postController.remove);
+app.patch('/posts/:id', checkAuth, postCreateValidation, handleValidationErrors, postController.update);
 
 app.listen(4444, () => console.log('Server OK!'));
