@@ -82,9 +82,6 @@ export const update = async (req: CreatePost, res: Response) => {
   }
 }
 
-
-
-
 export const create = async (req: CreatePost, res: Response) => {
   try {
     const document: Document = new PostModel({
