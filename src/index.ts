@@ -2,10 +2,8 @@ import express, { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import multer, { Multer, StorageEngine } from 'multer';
 import { registerValidation, loginValidation, postCreateValidation } from './validations';
-import checkAuth from './utils/checkAuth';
-import * as userController from './controllers/userController';
-import * as postController from './controllers/postController';
-import handleValidationErrors from './utils/handleValidationErrors';
+import { checkAuth, handleValidationErrors } from './utils';
+import { userController, postController } from './controllers';
 
 interface MulterCallback<T> {
   (error: Error | null, result: T): void
